@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Premios Amor</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #ffe6f0;
+      color: #111;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .premio {
+      background: white;
+      margin: 15px auto;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 300px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .boton {
+      background: #ff3385;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .boton[disabled] {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #admin-btn {
+      margin: 20px auto;
+      display: none;
+    }
+    .eliminar-btn {
+      margin-left: 10px;
+      background: #ff6666;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>¡Hola amor! 💖</h1>
+  <h2>Tus puntos: <span id="puntos">0</span></h2>
+  <button id="admin-btn" class="boton" onclick="sumarPuntos()">➕ Sumar 10 puntos</button>
+
+  <h3>Premios disponibles</h3>
+  <div id="catalogo"></div>
+  <h3>🎁 Premios reclamados</h3>
+  <ul id="reclamados"></ul>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzConOZkEqMd7dAf3QlDJPtNVsMMbEM0M",
+      authDomain: "premios-amor.firebaseapp.com",
+      databaseURL: "https://premios-amor-default-rtdb.firebaseio.com",
+      projectId: "premios-amor",
+      storageBucket: "premios-amor.appspot.com",
+      messagingSenderId: "183125096656",
+      appId: "1:183125096656:web:c6d21a91192928c45206d5"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const premios = [
+      { nombre: "Bono de ropa", puntos: 200 },
+      { nombre: "Cámara Instantánea", puntos: 800 },
+      { nombre: "Bono de zapatos", puntos: 300 },
+      { nombre: "Helado", puntos: 20 },
+      { nombre: "Productos cabello", puntos: 150 },
+      { nombre: "Cena romántica", puntos: 100 },
+      { nombre: "Cine", puntos: 50 }
+    ];
+
+    let estado = { puntos: 0, reclamados: [] };
+    let esAdmin = false;
+
+    function cargarDatos() {
+      db.ref("estado").on("value", (snapshot) => {
+        const data = snapshot.val();
+        estado.puntos = data.puntos || 0;
+        estado.reclamados = (data.reclamados || []).filter(p => p !== "_placeholder");
+        document.getElementById("puntos").innerText = estado.puntos;
+        renderCatalogo();
+        renderReclamados();
+      });
+    }
+
+    function renderCatalogo() {
+      const catalogo = document.getElementById("catalogo");
+      catalogo.innerHTML = "";
+      premios.forEach(premio => {
+        const div = document.createElement("div");
+        div.className = "premio";
+        div.innerHTML = `
+          <strong>${premio.nombre}</strong><br/>
+          ${premio.puntos} puntos<br/>
+          <button class="boton" ${estado.puntos >= premio.puntos ? "" : "disabled"} onclick="canjear('${premio.nombre}', ${premio.puntos})">Canjear</button>
+        `;
+        catalogo.appendChild(div);
+      });
+    }
+
+    function renderReclamados() {
+      const lista = document.getElementById("reclamados");
+      lista.innerHTML = "";
+      estado.reclamados.forEach((r, index) => {
+        const li = document.createElement("li");
+        li.innerText = r;
+        if (esAdmin) {
+          const btn = document.createElement("button");
+          btn.innerText = "❌";
+          btn.className = "boton eliminar-btn";
+          btn.onclick = () => eliminarReclamado(index);
+          li.appendChild(btn);
+        }
+        lista.appendChild(li);
+      });
+    }
+
+    function canjear(nombre, costo) {
+      if (estado.puntos < costo) return alert("No tienes suficientes puntos");
+      const nuevosPuntos = estado.puntos - costo;
+      const nuevosReclamados = [...estado.reclamados, nombre];
+      db.ref("estado").set({
+        puntos: nuevosPuntos,
+        reclamados: nuevosReclamados.length > 0 ? nuevosReclamados : ["_placeholder"]
+      });
+    }
+
+    function sumarPuntos() {
+      const nuevosPuntos = estado.puntos + 10;
+      db.ref("estado/puntos").set(nuevosPuntos);
+    }
+
+    function eliminarReclamado(index) {
+      const nuevos = [...estado.reclamados];
+      nuevos.splice(index, 1);
+      db.ref("estado/reclamados").set(nuevos.length > 0 ? nuevos : ["_placeholder"]);
+    }
+
+    function mostrarAdminSiEsNecesario() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("admin") === "amor") {
+        esAdmin = true;
+        document.getElementById("admin-btn").style.display = "inline-block";
+        renderReclamados(); // actualizar lista con botones de borrar
+      }
+    }
+
+    cargarDatos();
+    mostrarAdminSiEsNecesario();
+  </script>
+</body>
+</html>
